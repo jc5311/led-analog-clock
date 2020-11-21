@@ -44,10 +44,22 @@
 const int ledPinArr[NUM_LEDS] = {LED_0_PIN, LED_1_PIN, LED_2_PIN, LED_3_PIN, LED_4_PIN};
 Adafruit_NeoPixel strip(NUM_PIXELS, PIXEL_PIN, NEO_GRB + NEO_KHZ800);
 
+//test
+int ledCtr = 5;
+
+//functions
+void colorWipe(uint32_t color, int wait) {
+  for(int i=0; i<strip.numPixels(); i++) { // For each pixel in strip...
+    strip.setPixelColor(i, color);         //  Set pixel's color (in RAM)
+    strip.show();                          //  Update strip to match
+    delay(wait);                           //  Pause for a moment
+  }
+}
+
 void setup()
 {
-  // put your setup code here, to run once:
-
+  Serial.begin(9600);
+  
   //configure neopixel strip output
   strip.begin();           // INITIALIZE NeoPixel strip object (REQUIRED)
   strip.show();            // Turn OFF all pixels ASAP
@@ -65,5 +77,27 @@ void setup()
 
 void loop()
 {
-  // here is where you'd put code that needs to be running all the time.
+  #if 1 //diag buttons + leds + led strip
+
+  //test leds
+  for (int i = 0; i < NUM_LEDS; i++)
+  {
+    digitalWrite(ledPinArr[i], HIGH);
+    delay(1000);
+    digitalWrite(ledPinArr[i], LOW);
+  }
+
+  //test led strip
+  colorWipe(strip.Color(255,   0,   0), 50); // Red
+  colorWipe(strip.Color(  0, 255,   0), 50); // Green
+  colorWipe(strip.Color(  0,   0, 255), 50); // Blue
+
+  //collect button states and print
+  if (digitalRead(HOUR_BTN_PIN) == LOW)
+    Serial.print("Hour Pressed");
+  if (digitalRead(MIN_BTN_PIN) == LOW)
+    Serial.print("Minute Pressed");
+  if (digitalRead(AUX_BTN_PIN) == LOW)
+    Serial.print("Aux Pressed");
+  #endif
 }
