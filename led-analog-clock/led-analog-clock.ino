@@ -61,22 +61,37 @@ volatile int time[3] = {12, 0, 0}; //always start at 12:00:00
 
 //HW Diagnostics
 // #define PERFORM_DIAG
-#ifdef PERFORM_DIAG
-int ledCtr = 5;
-#endif
-
-//semaphore handles
-SemaphoreHandle_t xTimer1Sem;
-
-//task handles
-TaskHandle_t xTimingTask;
-TaskHandle_t xLightingTask;
 
 //ISRs
 ISR(TIMER1_OVF_vect) //Timer1
 {
-  //give the semaphore for the timing task
-  xSemaphoreGiveFromISR(xTimer1Sem, NULL);
+  if (time[SEC] >= 59)
+    {
+      if (time[MIN] >= 59)
+      {
+        if (time[HOUR] >= 12)
+        {
+          time[HOUR] = 1;
+          time[MIN] = 0;
+          time[SEC] = 0;
+        }
+        else
+        {
+          time[HOUR]++;
+          time[MIN] = 0;
+          time[SEC] = 0;
+        }
+      }
+      else
+      {
+        time[MIN]++;
+        time[SEC] = 0;
+      }
+    }
+    else
+    {
+      time[SEC]++;
+    }
 }
 
 void hourBtnInterruptHandler(void)
@@ -112,26 +127,6 @@ void setup()
   attachInterrupt(digitalPinToInterrupt(MIN_BTN_PIN), minBtnInterruptHandler, FALLING);
   attachInterrupt(digitalPinToInterrupt(AUX_BTN_PIN), auxBtnInterruptHandler, FALLING);
   interrupts(); //reenable interrupts since we are done with related configs
-
-  //create the binary semaphore for taskTiming
-  xTimer1Sem = xSemaphoreCreateBinary();
-
-  //create tasks
-  (void)xTaskCreate(
-      taskLighting,    //function that performs the task
-      "lighting",      //task description
-      128,             //task stack size
-      NULL,            //parameter passed to task
-      1,               //task priority
-      &xLightingTask); //task handle
-
-  (void)xTaskCreate(
-      taskTiming,    //function that performs the task
-      "timing",      //task description
-      128,           //task stack size
-      NULL,          //parameter passed to task
-      2,             //task priority
-      &xTimingTask); //task handle
   #endif //#ifdef PERFORM_DIAG
 
   //configure neopixel strip output
@@ -148,6 +143,10 @@ void setup()
   pinMode(HOUR_BTN_PIN, INPUT_PULLUP);
   pinMode(MIN_BTN_PIN, INPUT_PULLUP);
   pinMode(AUX_BTN_PIN, INPUT_PULLUP);
+
+  time[0] = 12;
+  time[1] = 0;
+  time[2] = 0;
 }
 
 void loop()
@@ -155,59 +154,11 @@ void loop()
   #ifdef PERFORM_DIAG
   performDiagTests();
   #else
-  //do nothing, everything is done in tasks
+  taskLighting();
   #endif
 }
 
-//***tasks***
-/*******************************************************************************
- * taskTiming
- * 
- * Description *
- * Update global time values when timer overflows
- * 
- * Arguments *
- * 
- * Returns *
- * ****************************************************************************/
-void taskTiming(void *pvParameters __attribute__((unused)))
-{
-  //a task should never return
-  while (1)
-  {
-    //block until we are freed by the 1Hz Timer 1 ISR
-    xSemaphoreTake(xTimer1Sem, portMAX_DELAY);
-
-    if (time[SEC] >= 59)
-    {
-      if (time[MIN] >= 59)
-      {
-        if (time[HOUR] >= 12)
-        {
-          time[HOUR] = 1;
-          time[MIN] = 0;
-          time[SEC] = 0;
-        }
-        else
-        {
-          time[HOUR]++;
-          time[MIN] = 0;
-          time[SEC] = 0;
-        }
-      }
-      else
-      {
-        time[MIN]++;
-        time[SEC] = 0;
-      }
-    }
-    else
-    {
-      time[SEC]++;
-    }
-  } //end of while(1)
-}
-
+// TASKS
 /*******************************************************************************
  * taskLighting
  * 
@@ -219,7 +170,7 @@ void taskTiming(void *pvParameters __attribute__((unused)))
  * 
  * Returns *
  * ****************************************************************************/
-void taskLighting(void *pvParameters __attribute__((unused)))
+void taskLighting(void)
 {
   uint8_t hourPixelIdx = 0;
   uint8_t minPixelIdx = 0;
@@ -285,7 +236,7 @@ void taskLighting(void *pvParameters __attribute__((unused)))
   } //end of while(1)
 }
 
-//***functions***
+// FUNCTIONS
 /*******************************************************************************
  * colorWipe
  * 
