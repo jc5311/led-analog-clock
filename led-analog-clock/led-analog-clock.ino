@@ -28,8 +28,6 @@
  * ****************************************************************************/
 
 //includes
-#include <Arduino_FreeRTOS.h>
-#include <semphr.h>
 #include <Adafruit_NeoPixel.h>
 #include <avr/interrupt.h>
 
@@ -49,7 +47,7 @@
 #define MIN_BTN_PIN 3
 #define AUX_BTN_PIN 4
 
-//globals
+// GLOBALS
 //led pins
 const int ledPinArr[NUM_LEDS] = {LED_0_PIN, LED_1_PIN, LED_2_PIN, LED_3_PIN, LED_AUX_PIN};
 Adafruit_NeoPixel strip(NUM_PIXELS, PIXEL_PIN, NEO_GRB + NEO_KHZ800);
@@ -59,10 +57,16 @@ Adafruit_NeoPixel strip(NUM_PIXELS, PIXEL_PIN, NEO_GRB + NEO_KHZ800);
 #define SEC 2                      //second idx in time array
 volatile int time[3] = {12, 0, 0}; //always start at 12:00:00
 
-//HW Diagnostics
+//button debounce
+unsigned long debounceDelay = 200;
+unsigned long lastHourDTime = 0;
+unsigned long lastMinDTime  = 0;
+unsigned long lastAuxDTime   = 0;
+
+// HW Diagnostics
 // #define PERFORM_DIAG
 
-//ISRs
+// ISRs
 ISR(TIMER1_OVF_vect) //Timer1
 {
   if (time[SEC] >= 59)
@@ -143,10 +147,6 @@ void setup()
   pinMode(HOUR_BTN_PIN, INPUT_PULLUP);
   pinMode(MIN_BTN_PIN, INPUT_PULLUP);
   pinMode(AUX_BTN_PIN, INPUT_PULLUP);
-
-  time[0] = 12;
-  time[1] = 0;
-  time[2] = 0;
 }
 
 void loop()
@@ -313,37 +313,49 @@ void performDiagTests(void)
  * ****************************************************************************/
 void handleButtonPress(uint8_t btnPin)
 {
+  unsigned long timeReading = millis();
+
   switch (btnPin)
   {
     case HOUR_BTN_PIN:
     {
-      time[SEC] = 0; //reset seconds if changing time
-      if (time[HOUR] >= 12)
-        time[HOUR] = 1;
-      else
-        time[HOUR]++;
+      if ((timeReading - lastHourDTime) > debounceDelay)
+      {
+        time[SEC] = 0; //reset seconds if changing time
+        if (time[HOUR] >= 12)
+          time[HOUR] = 1;
+        else
+          time[HOUR]++;
+
+        lastHourDTime = timeReading;
+      }
       break;
     }
 
     case MIN_BTN_PIN:
     {
-      time[SEC] = 0; //reset seconds if changing time
-      if (time[MIN] >= 59)
+      if((timeReading - lastMinDTime) > debounceDelay)
       {
-        if (time[HOUR] >= 12)
+        time[SEC] = 0; //reset seconds if changing time
+        if (time[MIN] >= 59)
         {
-          time[HOUR] = 1;
-          time[MIN] = 0;
+          if (time[HOUR] >= 12)
+          {
+            time[HOUR] = 1;
+            time[MIN] = 0;
+          }
+          else
+          {
+            time[HOUR]++;
+            time[MIN] = 0;
+          }
+          
         }
         else
-        {
-          time[HOUR]++;
-          time[MIN] = 0;
-        }
-        
+          time[MIN]++;
+
+        lastMinDTime = timeReading;
       }
-      else
-        time[MIN]++;
       break;
     }
 
