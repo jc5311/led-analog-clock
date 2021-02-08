@@ -47,6 +47,7 @@
 #define MIN_BTN_PIN 3
 #define AUX_BTN_PIN 4
 
+#define RTC_SQR_PIN 11
 // GLOBALS
 //led pins
 const int ledPinArr[NUM_LEDS] = {LED_0_PIN, LED_1_PIN, LED_2_PIN, LED_3_PIN, LED_AUX_PIN};
@@ -58,7 +59,7 @@ Adafruit_NeoPixel strip(NUM_PIXELS, PIXEL_PIN, NEO_GRB + NEO_KHZ800);
 volatile int time[3] = {12, 0, 0}; //always start at 12:00:00
 
 //button debounce
-unsigned long debounceDelay = 200;
+unsigned long debounceDelay = 300;
 unsigned long lastHourDTime = 0;
 unsigned long lastMinDTime  = 0;
 unsigned long lastAuxDTime   = 0;
@@ -119,14 +120,14 @@ void setup()
   Serial.begin(9600);
   #else
   noInterrupts(); //disable interrupts while configuring interrupt related items
-  //configure 16-bit timer 1 to generate 1Hz interrupt
+    //configure 16-bit timer 1 to generate 1Hz interrupt
   TCCR1A = 0;             //Normal-Mode on Timer1
   TCCR1B = 0;             //Temporarily disable timer clock for configuration
   TCNT1 = 3036;           //Set Start cnt to 3036 to force 1Hz overflow
   TCCR1B |= (1 << CS12);  //Enable i/o clk + 256 prescaler
   TIMSK1 |= (1 << TOIE1); //Enable Timer1 interrupts
 
-  //configure pin change interrupts for the hour, min, and aux btns
+//configure pin change interrupts for the hour, min, and aux btns
   attachInterrupt(digitalPinToInterrupt(HOUR_BTN_PIN), hourBtnInterruptHandler, FALLING);
   attachInterrupt(digitalPinToInterrupt(MIN_BTN_PIN), minBtnInterruptHandler, FALLING);
   attachInterrupt(digitalPinToInterrupt(AUX_BTN_PIN), auxBtnInterruptHandler, FALLING);
@@ -136,7 +137,7 @@ void setup()
   //configure neopixel strip output
   strip.begin();           // INITIALIZE NeoPixel strip object (REQUIRED)
   strip.show();            // Turn OFF all pixels ASAP
-  strip.setBrightness(50); // Set BRIGHTNESS to about 1/5 (max = 255)
+  strip.setBrightness(255); // Set BRIGHTNESS to about 1/5 (max = 255)
 
   //configure led outputs
   for (int i = 0; i < NUM_LEDS; i++)
@@ -227,10 +228,13 @@ void taskLighting(void)
     if(minLedIdx != tempMinLedIdx)
     {
       minLedIdx = tempMinLedIdx;
-      clearMinLeds();
       if (minLedIdx < NUM_MIN_LEDS)
       {
         digitalWrite(ledPinArr[minLedIdx], HIGH);
+      }
+      else
+      {
+        clearMinLeds();
       }
     }
   } //end of while(1)
@@ -390,7 +394,24 @@ void getPixelAndLedIndices(uint8_t* hourPixelIdx, uint8_t* minPixelIdx,
   uint8_t currMin = time[MIN];
   uint8_t minModFive = 0;
 
-  *hourPixelIdx = time[HOUR] - 1;
+  //pixel 0 is at the 12 hour mark
+  //hours are 1-12
+  // H12 : LED0
+  // H1  : LED1
+  // H2  : LED2
+  // H3  : LED3
+  // H4  : LED4
+  // H5  : LED5
+  // H6  : LED6
+  // H7  : LED7
+  // H8  : LED8
+  // H9  : LED9
+  // H10 : LED10
+  // H11 : LED11
+  if (time[HOUR] == 12)
+    *hourPixelIdx = 0;
+  else
+    *hourPixelIdx = time[HOUR];
 
   minModFive = time[MIN] % 5;
   if(minModFive == 0)
@@ -400,51 +421,51 @@ void getPixelAndLedIndices(uint8_t* hourPixelIdx, uint8_t* minPixelIdx,
 
   if ((currMin >= 0) && (currMin < 5))
   {
-    *minPixelIdx = 11;
+    *minPixelIdx = 0;
   }
   else if ((currMin >= 5) && (currMin < 10))
   {
-    *minPixelIdx = 0;
+    *minPixelIdx = 1;
   }
   else if ((currMin >= 10) && (currMin < 15))
   {
-    *minPixelIdx = 1;
+    *minPixelIdx = 2;
   }
   else if ((currMin >= 15) && (currMin < 20))
   {
-    *minPixelIdx = 2;
+    *minPixelIdx = 3;
   }
   else if ((currMin >= 20) && (currMin < 25))
   {
-    *minPixelIdx = 3;
+    *minPixelIdx = 4;
   }
   else if ((currMin >= 25) && (currMin < 30))
   {
-    *minPixelIdx = 4;
+    *minPixelIdx = 5;
   }
   else if ((currMin >= 30) && (currMin < 35))
   {
-    *minPixelIdx = 5;
+    *minPixelIdx = 6;
   }
   else if ((currMin >= 35) && (currMin < 40))
   {
-    *minPixelIdx = 6;
+    *minPixelIdx = 7;
   }
   else if ((currMin >= 40) && (currMin < 45))
   {
-    *minPixelIdx = 7;
+    *minPixelIdx = 8;
   }
   else if ((currMin >= 45) && (currMin < 50))
   {
-    *minPixelIdx = 8;
+    *minPixelIdx = 9;
   }
   else if ((currMin >= 50) && (currMin < 55))
   {
-    *minPixelIdx = 9;
+    *minPixelIdx = 10;
   }
   else //((currMin >= 55) && (currMin < 60 /*0*/ ))
   {
-    *minPixelIdx = 10;
+    *minPixelIdx = 11;
   }
   return;
 }
